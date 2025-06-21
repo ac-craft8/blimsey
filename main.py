@@ -39,8 +39,10 @@ from config_loader import (
     load_telegram_token,
     load_ai_prompt,
     load_whitelist,
-    load_keyword_phrases
+    load_keyword_phrases,
 )
+import bootstrap
+bootstrap.ensure_required_files()
 from messages import processing_lock_message
 from config_loader import load_chroma_client
 
