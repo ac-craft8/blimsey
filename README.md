@@ -53,6 +53,8 @@ ollama pull llama2
 ```
 
 > **Note**: The model name must match the one set in `settings.py`.
+> The first run of `python main.py` automatically creates any missing local
+> directories (like `logs/`) and stub modules such as `messages/`.
 
 ---
 
