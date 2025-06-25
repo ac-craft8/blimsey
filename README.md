@@ -111,6 +111,7 @@ You should see logs indicating the bot is online. Start chatting with it on Tele
 - Memory is managed using ChromaDB and auto-saved in `./chroma_memoria/`
 - Backups of all memory are stored in `user_backups_<model>/`
 - If the assistant sees keywords like "I am", "my name is", or "I like", it updates summaries.
+- Memory management functions reside in `memory_manager.py` for loading, querying, and storing user data.
 
 ---
 

@@ -28,7 +28,6 @@ import traceback
 from datetime import datetime
 
 # ===== Third-Party Library Imports =====
-import chromadb
 import ollama
 from telegram import ParseMode
 from telegram.ext import CommandHandler, Filters, MessageHandler, Updater
@@ -42,7 +41,14 @@ from config_loader import (
     load_keyword_phrases
 )
 from messages import processing_lock_message
-from config_loader import load_chroma_client
+from memory_manager import (
+    load_chroma_client,
+    get_memory_key,
+    get_user_memory,
+    query_memory,
+    get_last_interaction,
+    store_in_memory
+)
 
 
 # ================================
@@ -429,127 +435,6 @@ def get_summary_text(user_id):
     else:
         return "No hay información de resumen disponible."
 
-# Memory management functions
-def get_memory_key(user_id):
-    """Generate memory key for user"""
-    return f"user_{user_id}"
-
-def get_user_memory(user_id):
-    """Get or create user memory collection if enabled"""
-    if not client:
-        return None
-    return client.get_or_create_collection(name=get_memory_key(user_id))
-
-
-def query_memory(memory, prompt):
-    """Query user memory for relevant context"""
-    def store_in_memory(memory, prompt, response, model_name, user_id):
-            if not memory:
-                print("[Memory] Skipped storing interaction - memory is disabled.")
-            return   
-    print(f"[{time.ctime()}] Querying memory for prompt.")
-    try:
-        result = memory.query(query_texts=[prompt], n_results=5, include=['documents'])
-        documents = [doc for sublist in result['documents'] for doc in sublist if doc.strip()]
-        if documents:
-            return "\n---\n".join(documents[:5])
-        return "No relevant previous context found."
-    except Exception as e:
-        print(f"ERROR querying memory: {e}")
-        return "Memory query failed."
-
-def get_last_interaction(memory):
-    """Get the most recent interaction from memory"""
-    def store_in_memory(memory, prompt, response, model_name, user_id):
-        if not memory:
-            print("[Memory] Skipped storing interaction - memory is disabled.")
-        return   
-    try:
-        data = memory.get()
-        if not data["documents"]:
-            return "No previous conversation history."
-        last_doc = data["documents"][-1]
-        return f"Last interaction: {last_doc}"
-    except Exception as e:
-        print(f"ERROR getting last interaction: {e}")
-        return "Could not retrieve last interaction."
-
-def store_in_memory(memory, prompt, response, model_name, user_id):
-    """Store interaction in memory and create backups"""
-    def store_in_memory(memory, prompt, response, model_name, user_id):
-        if not memory:
-            print("[Memory] Skipped storing interaction - memory is disabled.")
-        return    
-    print(f"[{time.ctime()}] Storing interaction in memory.")
-    try:
-        # Store in ChromaDB
-        memory.add(
-            documents=[f"User: {prompt}\nAssistant: {response}"],
-            ids=[str(time.time())]
-        )
-        
-        # Create backup
-        user_dir = f"./user_backups_{model_name.replace(':', '_').replace('.', '_')}"
-        os.makedirs(user_dir, exist_ok=True)
-        backup_file = os.path.join(user_dir, f"{get_memory_key(user_id)}.json")
-        
-        all_data = memory.get()
-        backup = [{"id": id, "text": doc} for id, doc in zip(all_data['ids'], all_data['documents'])]
-        
-        with open(backup_file, 'w', encoding='utf-8') as f:
-            json.dump(backup, f, ensure_ascii=False, indent=2)
-        
-        # Extract and save code blocks
-        code_blocks = re.findall(r"```python\n(.*?)```", response, re.DOTALL)
-        if code_blocks:
-            code_dir = os.path.join("./codigo_extraido", get_memory_key(user_id))
-            os.makedirs(code_dir, exist_ok=True)
-            
-            for i, block in enumerate(code_blocks):
-                filename = f"respuesta_{int(time.time())}_bloque{i + 1}.py"
-                filepath = os.path.join(code_dir, filename)
-                with open(filepath, "w", encoding="utf-8") as code_file:
-                    code_file.write(block.strip())
-                    
-    except Exception as e:
-        print(f"ERROR storing in memory: {e}")
-
-    
-    """Store interaction in memory and create backups"""
-    print(f"[{time.ctime()}] Storing interaction in memory.")
-    try:
-        # Store in ChromaDB
-        memory.add(
-            documents=[f"User: {prompt}\nAssistant: {response}"],
-            ids=[str(time.time())]
-        )
-        
-        # Create backup
-        user_dir = f"./user_backups_{model_name.replace(':', '_').replace('.', '_')}"
-        os.makedirs(user_dir, exist_ok=True)
-        backup_file = os.path.join(user_dir, f"{get_memory_key(user_id)}.json")
-        
-        all_data = memory.get()
-        backup = [{"id": id, "text": doc} for id, doc in zip(all_data['ids'], all_data['documents'])]
-        
-        with open(backup_file, 'w', encoding='utf-8') as f:
-            json.dump(backup, f, ensure_ascii=False, indent=2)
-        
-        # Extract and save code blocks
-        code_blocks = re.findall(r"```python\n(.*?)```", response, re.DOTALL)
-        if code_blocks:
-            code_dir = os.path.join("./codigo_extraido", get_memory_key(user_id))
-            os.makedirs(code_dir, exist_ok=True)
-            
-            for i, block in enumerate(code_blocks):
-                filename = f"respuesta_{int(time.time())}_bloque{i + 1}.py"
-                filepath = os.path.join(code_dir, filename)
-                with open(filepath, "w", encoding="utf-8") as code_file:
-                    code_file.write(block.strip())
-                    
-    except Exception as e:
-        print(f"ERROR storing in memory: {e}")
-
 def extract_final_response(full_response):
     """Extract only the final response from the model output, removing thinking process"""
     # Si la respuesta contiene markdown para pensamiento (como en algunos modelos)
@@ -590,7 +475,7 @@ def extract_final_response(full_response):
 # AI Response generation
 '''def generate_response(user_id, prompt):
     """Generate AI response using Ollama"""
-    memory = get_user_memory(user_id)
+    memory = get_user_memory(user_id, client)
     context = query_memory(memory, prompt)
     recent_context = get_last_interaction(memory)
     summary = get_summary_text(user_id)
@@ -630,7 +515,7 @@ def extract_final_response(full_response):
 
 def generate_response(user_id, prompt):
     """Generate AI response using Ollama"""
-    memory = get_user_memory(user_id)
+    memory = get_user_memory(user_id, client)
     base_prompt = load_ai_prompt(user_id)  # <-- nuevo comportamiento
     full_prompt = f"{base_prompt}\n\nUser instruction: {prompt}"
 
@@ -769,7 +654,7 @@ def reload_command(update, context):
         update.message.reply_text("No tienes autorización para usar este comando.")
         return
     
-    memory = get_user_memory(user_id)
+    memory = get_user_memory(user_id, client)
     try:
         if not memory.get()["documents"]:
             update.message.reply_text("No hay nada que persistir: la memoria está vacía.")
