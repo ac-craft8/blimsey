@@ -141,6 +141,14 @@ whatsapp = False
 - All state is local and editable — JSON logs, backups, prompt injection.
 - Fully compatible with private or air-gapped setups.
 
+### Code Structure
+
+- `main.py`: Orchestrator script, minimal logic.
+- `handlers/`: Contains Telegram bot interaction and commands.
+- `core/`: Engine logic for AI generation, summaries, and logging.
+
+Logic is now split into small, testable modules following the Single Responsibility Principle.
+
 ---
 
 ## 📘 License
