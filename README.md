@@ -149,6 +149,13 @@ MIT License. Open-source, free to use and extend. Contributions welcome!
 
 ---
 
+## ☕ Support Blimsey
+
+If you like this project and want to support its evolution, consider buying me a coffee!
+
+[![Buy Me a Coffee](https://img.shields.io/badge/-Buy%20me%20a%20coffee-ffdd00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/ac.craft8)
+
+
 ## 🚀 Coming Soon
 
 - CLI interface for terminal users
